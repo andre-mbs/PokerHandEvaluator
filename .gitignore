@@ -1,0 +1,5 @@
+# ignore all output files
+*.out
+
+# ignore compiled code
+*.a
