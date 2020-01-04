@@ -24,7 +24,7 @@ using namespace cv;
 using namespace phevaluator;
 
 // To store an image
-Mat IMAGE1;
+//Mat IMAGE1;
 Mat IMAGE2;
 Mat IMAGE3;
 
@@ -45,23 +45,25 @@ class TrainRank{
     public:
 		Mat img;
 		String name;
-
+		String shortName;
 };
 
 class TrainSuit{
     public:
 		Mat img;
 		String name;
-
+		String shortName;
 };
 
 vector<TrainRank> loadRanks(String path){
 	vector<TrainRank> trainRanks;
 	vector<String> ranks{"Ace","Two","Three","Four","Five","Six","Seven", "Eight","Nine","Ten","Jack","Queen","King"};
+	vector<String> ranksShort{"A","2","3","4","5","6","7", "8","9","10","J","Q","K"};
 
 	for(int i=0; i<13; i++){
 		TrainRank tr;
 		tr.name = ranks.at(i);
+		tr.shortName = ranksShort.at(i);
 		String filename = path+ranks.at(i)+".jpg";
 		tr.img = imread(filename, IMREAD_GRAYSCALE);
 		trainRanks.push_back(tr);
@@ -73,10 +75,12 @@ vector<TrainRank> loadRanks(String path){
 vector<TrainSuit> loadSuits(String path){
 	vector<TrainSuit> trainSuits;
 	vector<String> suits{"Diamonds", "Clubs", "Hearts", "Spades"};
+	vector<String> suitsShort{"d", "c", "h", "s"};
 
 	for(int i=0; i<suits.size(); i++){
 		TrainSuit ts;
 		ts.name = suits.at(i);
+		ts.shortName = suitsShort.at(i);
 		String filename = path+suits.at(i)+".jpg";
 		ts.img = imread(filename, IMREAD_GRAYSCALE);
 		trainSuits.push_back(ts);
@@ -158,13 +162,13 @@ QueryCard preprocess_card(vector<Point> contour, Mat image){
 	Mat qRank = queryThresh(Rect(10, 10, 100, 160));
 	Mat qSuit = queryThresh(Rect(10, 155, 96, 120));
 
-	imshow("Imagem1", qRank);
+	//imshow("Imagem1", qRank);
 
 	// Get negative of rank and suit images
 	Mat qRankInv = 255 - qRank;
 	Mat qSuitInv = 255 - qSuit;
 
-	imshow("Imagem2", qRankInv);
+	//imshow("Imagem2", qRankInv);
 
 
 	/* Mat kernel = getStructuringElement(MORPH_RECT, Size(1, 1));
@@ -223,11 +227,13 @@ QueryCard preprocess_card(vector<Point> contour, Mat image){
     The best match is the rank or suit image that has the least difference.
 	Returns a string with value (rank) and suit. ex: "Ace Clubs"
  */
-String getMatchCard(QueryCard qCard, vector<TrainRank> trainRanks, vector<TrainSuit> trainSuits){
+vector<String> getMatchCard(QueryCard qCard, vector<TrainRank> trainRanks, vector<TrainSuit> trainSuits){
 	int bestRankMatchDiff = 10000;
     int bestSuitMatchDiff = 10000;
     String bestRankMatchName = "Unknown";
+    String bestRankMatchShortName = "Unknown";
     String bestSuitMatchName = "Unknown";
+    String bestSuitMatchShortName = "Unknown";
 
 	Mat MinDiff;
 
@@ -240,7 +246,7 @@ String getMatchCard(QueryCard qCard, vector<TrainRank> trainRanks, vector<TrainS
 		if(rankDiff < bestRankMatchDiff){
 			bestRankMatchDiff = rankDiff;
 			bestRankMatchName = tRank.name;
-			//MinDiff = diffRankImg;
+			bestRankMatchShortName = tRank.shortName;
 		}
 	}
 
@@ -253,13 +259,18 @@ String getMatchCard(QueryCard qCard, vector<TrainRank> trainRanks, vector<TrainS
 		if(suitDiff < bestSuitMatchDiff){
 			bestSuitMatchDiff = suitDiff;
 			bestSuitMatchName = tSuit.name;
-			MinDiff = diffSuitImg;
+			bestSuitMatchShortName = tSuit.shortName;
+			//MinDiff = diffSuitImg;
 		}
 	}
 	
-	imshow("Imagem0", MinDiff);
-	//cout << String(bestRankMatchName + " | " + bestSuitMatchName); 
-	return bestRankMatchName + " " + bestSuitMatchName;
+	//imshow("Imagem0", MinDiff);
+	//cout << String(bestRankMatchName + " | " + bestSuitMatchName);
+	vector<String> result;
+	result.push_back(bestRankMatchName);
+	result.push_back(bestSuitMatchName);
+	result.push_back(String(bestRankMatchShortName + bestSuitMatchShortName));
+	return result;
 }
 
 void mouseEvent(int event, int x, int y, int flags, void* userData){
@@ -279,34 +290,28 @@ int main( void )
 
 	// Create a window to display the image	
 	namedWindow( "Imagem", cv::WINDOW_AUTOSIZE );
-	namedWindow( "Imagem0", cv::WINDOW_AUTOSIZE );
-	namedWindow( "Imagem1", cv::WINDOW_AUTOSIZE );
-	namedWindow( "Imagem2", cv::WINDOW_AUTOSIZE );
+	// namedWindow( "Imagem0", cv::WINDOW_AUTOSIZE );
+	// namedWindow( "Imagem1", cv::WINDOW_AUTOSIZE );
+	// namedWindow( "Imagem2", cv::WINDOW_AUTOSIZE );
 	namedWindow( "Imagem3", cv::WINDOW_AUTOSIZE );
-/*	namedWindow( "Imagem4", cv::WINDOW_AUTOSIZE );
-	namedWindow( "Imagem5", cv::WINDOW_AUTOSIZE );
-	namedWindow( "Imagem6", cv::WINDOW_AUTOSIZE );
-*/
 
-	IMAGE1 = imread( "test_images/poker_hand5.jpg", IMREAD_UNCHANGED );
-
-	resize(IMAGE1, IMAGE1, Size(), 0.4, 0.4);
-	//rotate(IMAGE1, IMAGE1, ROTATE_90_CLOCKWISE);
-
-	if( IMAGE1.empty() )
+	Mat frame = imread( "test_images/poker_hand5.jpg", IMREAD_UNCHANGED );
+	if( frame.empty() )
 	{
 		// NOT SUCCESSFUL : the data attribute is empty
-		cout << "Image file could not be open !!" << endl;
+		cout << "Capture/Openning error: frame or image not found" << endl;
 
 		return -1;
 	}
 
-	cvtColor(IMAGE1, IMAGE2, COLOR_BGR2GRAY);
+	resize(frame, frame, Size(), 0.4, 0.4);
+	if(frame.size().height > frame.size().width)
+		rotate(frame, frame, ROTATE_90_CLOCKWISE);
+	
+	imshow( "Imagem", frame );
 
-	//imshow("Imagem3", IMAGE2);
-
-	//GaussianBlur( IMAGE2, IMAGE2, Size( 25, 15 ), 0, 0 );
-	//medianBlur( IMAGE2, IMAGE2, 6);
+	// Grayscale image
+	cvtColor(frame, IMAGE2, COLOR_BGR2GRAY);
 
 	// REFACTOR: threshold value shouldn't be static...
 	threshold(IMAGE2, IMAGE2, 120, 255, THRESH_BINARY_INV);
@@ -318,53 +323,54 @@ int main( void )
 		erode(IMAGE2, IMAGE2, kernel);
 	}
 
-	/// Find contours   
-	vector<vector<Point> > contours;
-	vector<vector<Point> > cardsContours;
+	// Find contours   
+	vector<vector<Point>> contours;
+	vector<vector<Point>> cardsContours;
 	vector<Vec4i> hierarchy;
 	findContours( IMAGE2, contours, hierarchy, CV_RETR_TREE, CV_CHAIN_APPROX_SIMPLE );
-	/// Draw contours
+
+	// Draw contours
 	Scalar color = Scalar( 255, 0, 0 );
-	
 	if(contours.size() > 0){
 		for( int i = 0; i< contours.size(); i++ )
 		{
 			if(contourArea(contours[i], false) > 70000 && contourArea(contours[i], false) < 150000){
-				drawContours( IMAGE1, contours, i, color, 2, 8 );
+				drawContours( frame, contours, i, color, 2, 8 );
 				cardsContours.push_back(contours[i]);
 			}
 		}
 	}else{
-		cout << "No countours found";
-	}
-
-	if(cardsContours.size() > 0){
-		for(int i=0; i<cardsContours.size(); i++){
-			QueryCard card = preprocess_card(cardsContours[i], IMAGE1);
-			//imshow( "Imagem"+to_string(i), img);
-
-			String a = getMatchCard(card, trainRanks, trainSuits);
-			cout << a + "\n";
-		}
-	}else{
-		cout << "No cards found";
+		cout << "Detection error: 0 countours found" << endl;
 	}
 	
+	vector<String> hand;
+	if(cardsContours.size() > 0){
+		for(int i=0; i<cardsContours.size(); i++){
+			QueryCard card = preprocess_card(cardsContours[i], frame);
+			vector<String> a = getMatchCard(card, trainRanks, trainSuits);
+			hand.push_back(a.at(2));
+			cout << a.at(2) << endl;
+		}
+	}else{
+		cout << "Detection error: 0 cards found" << endl;
+	}
 
-	imshow( "Imagem", IMAGE1 );
+	if(hand.size() == 7){
+		Rank rank1 = EvaluateCards(hand.at(0).c_str(), hand.at(1).c_str(), hand.at(2).c_str(),
+								   hand.at(3).c_str(), hand.at(4).c_str(), hand.at(5).c_str(), hand.at(6).c_str());
+		cout << rank1.describeCategory() + ": " + rank1.describeRank() << endl;
+	}else
+	{
+		cout << "Evaluation error: hand.size() != 7 -> Make sure you have 7 cards" << endl;
+	}
 
-	Rank rank1 = EvaluateCards("9c", "4c", "4s", "9d", "4h", "Qc", "6c");
-	Rank rank2 = EvaluateCards("9c", "4c", "4s", "9d", "4h", "2c", "9c");
-
-	assert(rank1 < rank2);
-
-	// Wait for a pressed key
-
-    waitKey( 0 );
-
-	// Destroy the window --- Actually not needed in such a simple program
-
-	destroyWindow( "Display window" );
-
-	return 0;
+	// Wait for esc key
+	while (1)
+	{
+		int key = waitKey(0);
+		switch (key){
+		case 27:
+			return 0;
+		}
+	}
 }
