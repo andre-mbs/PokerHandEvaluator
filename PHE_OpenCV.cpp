@@ -24,7 +24,6 @@ using namespace cv;
 using namespace phevaluator;
 
 // To store an image
-//Mat IMAGE1;
 Mat IMAGE2;
 Mat IMAGE3;
 
@@ -162,19 +161,9 @@ QueryCard preprocess_card(vector<Point> contour, Mat image){
 	Mat qRank = queryThresh(Rect(10, 10, 100, 160));
 	Mat qSuit = queryThresh(Rect(10, 155, 96, 120));
 
-	//imshow("Imagem1", qRank);
-
 	// Get negative of rank and suit images
 	Mat qRankInv = 255 - qRank;
 	Mat qSuitInv = 255 - qSuit;
-
-	//imshow("Imagem2", qRankInv);
-
-
-	/* Mat kernel = getStructuringElement(MORPH_RECT, Size(1, 1));
-    for(int i=0; i<1; i++){
-        dilate(qRankInv, qRankInv, kernel);
-    } */
 
 	// Find rank contours
     vector<vector<Point> > rankContours;
@@ -261,7 +250,6 @@ vector<String> getMatchCard(QueryCard qCard, vector<TrainRank> trainRanks, vecto
 			bestSuitMatchDiff = suitDiff;
 			bestSuitMatchName = tSuit.name;
 			bestSuitMatchShortName = tSuit.shortName;
-			//MinDiff = diffSuitImg;
 		}
 	}
 	
@@ -279,7 +267,6 @@ void mouseEvent(int event, int x, int y, int flags, void* userData){
 		Mat* img = (Mat*)userData;
 		Mat i = *img;
 
-        //cout << "Left button of the mouse is clicked - position (" << x << ", " << y << ")" << endl;
         cout << "Value: " << to_string(i.at<char>(Point(x, y))) << endl;
     }
 }
