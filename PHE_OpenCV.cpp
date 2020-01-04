@@ -225,7 +225,8 @@ QueryCard preprocess_card(vector<Point> contour, Mat image){
 	Finds best rank and suit matches for the query card. Differences
     the query card rank and suit images with the train rank and suit images.
     The best match is the rank or suit image that has the least difference.
-	Returns a string with value (rank) and suit. ex: "Ace Clubs"
+	Returns a vector of strings with value (rank), suit and short name.
+	ex: {"Seven", "Clubs", "7c"}
  */
 vector<String> getMatchCard(QueryCard qCard, vector<TrainRank> trainRanks, vector<TrainSuit> trainSuits){
 	int bestRankMatchDiff = 10000;
