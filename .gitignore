@@ -3,3 +3,6 @@
 
 # ignore compiled code
 *.a
+
+# ignore vscode files
+*.vscode/
