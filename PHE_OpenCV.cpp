@@ -27,6 +27,8 @@ using namespace phevaluator;
 Mat IMAGE2;
 Mat IMAGE3;
 
+Mat ranks_inv;
+Mat suits_inv;
 Mat diffsRank;
 Mat diffsSuit;
 
@@ -137,6 +139,9 @@ QueryCard preprocess_card(vector<Point> contour, Mat image){
 	qCard.width = boundRect.width;
 	qCard.height = boundRect.height;
 
+	/* Mat cropped = image(boundRect);
+	imshow("Cropped Card", cropped); */
+
 	// Find center point of card by taking x and y average of the four corners
 	Point sum = Point(0, 0); 
 	for(int i=0; i<approx.size(); i++){
@@ -149,6 +154,7 @@ QueryCard preprocess_card(vector<Point> contour, Mat image){
 
 	// Warp card into 200x300 flattened image using perspective transform
 	qCard.warp = flattener(image, approx, qCard.center, qCard.width, qCard.height);
+	imshow("Cropped Card", qCard.warp);
 
 	// Grab corner of warped card image and do a 4x zoom
 	Mat corner = qCard.warp(Rect(5, 5, 32, 84));
@@ -204,8 +210,8 @@ QueryCard preprocess_card(vector<Point> contour, Mat image){
 	resize(qSuitInv(suitBoundRect), qSuitSized, Size(70, 100));
 	qCard.suit_img = qSuitSized;
 
-	hconcat(diffsRank, qCard.rank_img, diffsRank);
-	hconcat(diffsSuit, qCard.suit_img, diffsSuit);
+	hconcat(ranks_inv, qCard.rank_img, ranks_inv);
+	hconcat(suits_inv, qCard.suit_img, suits_inv);
 
 	// DEBUG
     for(int i=0; i<approx.size(); i++){
@@ -231,7 +237,8 @@ vector<String> getMatchCard(QueryCard qCard, vector<TrainRank> trainRanks, vecto
     String bestSuitMatchName = "Unknown";
     String bestSuitMatchShortName = "Unknown";
 
-	Mat minDiff;
+	Mat minRankDiff;
+	Mat minSuitDiff;
 
 	for(int i=0; i<trainRanks.size(); i++){
 		TrainRank tRank = trainRanks.at(i);
@@ -243,10 +250,9 @@ vector<String> getMatchCard(QueryCard qCard, vector<TrainRank> trainRanks, vecto
 			bestRankMatchDiff = rankDiff;
 			bestRankMatchName = tRank.name;
 			bestRankMatchShortName = tRank.shortName;
-			minDiff = diffRankImg;
+			minRankDiff = diffRankImg;
 		}
 	}
-
 
 	for(int i=0; i<trainSuits.size(); i++){
 		TrainSuit tSuit = trainSuits.at(i);
@@ -258,12 +264,15 @@ vector<String> getMatchCard(QueryCard qCard, vector<TrainRank> trainRanks, vecto
 			bestSuitMatchDiff = suitDiff;
 			bestSuitMatchName = tSuit.name;
 			bestSuitMatchShortName = tSuit.shortName;
-			//minDiff = diffSuitImg;
+			minSuitDiff = diffSuitImg;
 		}
 	}
 
-	//imshow("Imagem0", MinDiff);
-	//cout << String(bestRankMatchName + " | " + bestSuitMatchName);
+	//cout << minSuitDiff.size().height << endl;
+
+	hconcat(diffsRank, minRankDiff, diffsRank);
+	hconcat(diffsSuit, minSuitDiff, diffsSuit);
+
 	vector<String> result;
 	result.push_back(bestRankMatchName);
 	result.push_back(bestSuitMatchName);
@@ -290,19 +299,22 @@ int main( int argc, char* argv[] )
 	vector<TrainRank> trainRanks = loadRanks("Card_Imgs/");
 	vector<TrainSuit> trainSuits = loadSuits("Card_Imgs/");
 
-	diffsSuit = Mat(trainSuits.at(0).img.size().height, 1, trainSuits.at(0).img.type(), Scalar(0, 0, 0));
-	diffsRank = Mat(trainRanks.at(0).img.size().height, 1, trainRanks.at(0).img.type(), Scalar(0, 0, 0));
-	//diffsSuit = Mat(130, 1, trainSuits.at(0).img.type(), Scalar(0, 0, 0));
-	//diffsRank = Mat(160, 1, trainRanks.at(0).img.type(), Scalar(0, 0, 0));
+	suits_inv = Mat(trainSuits.at(0).img.size().height, 1, trainSuits.at(0).img.type(), Scalar(0, 0, 0));
+	ranks_inv = Mat(trainRanks.at(0).img.size().height, 1, trainRanks.at(0).img.type(), Scalar(0, 0, 0));
+	diffsSuit = Mat(100, 1, trainSuits.at(0).img.type(), Scalar(0, 0, 0));
+	diffsRank = Mat(125, 1, trainRanks.at(0).img.type(), Scalar(0, 0, 0));
 
 	// Create a window to display the image	
-	namedWindow( "Imagem", cv::WINDOW_AUTOSIZE );
-	namedWindow( "Imagem3", cv::WINDOW_AUTOSIZE );
+	namedWindow( "Card Detection", cv::WINDOW_AUTOSIZE );
+	namedWindow( "Grayscale", cv::WINDOW_AUTOSIZE );
+	namedWindow( "Threshold: 100", cv::WINDOW_AUTOSIZE );
+	namedWindow( "Cropped Card", cv::WINDOW_AUTOSIZE );
 	namedWindow( "Diff Rank", cv::WINDOW_AUTOSIZE );
 	namedWindow( "Diff Suit", cv::WINDOW_AUTOSIZE );
+	namedWindow( "Rank", cv::WINDOW_AUTOSIZE );
+	namedWindow( "Suit", cv::WINDOW_AUTOSIZE );
 
 	String fileName = "test_images/" + String(argv[1]);
-	cout << fileName << endl;
 	Mat frame = imread( fileName, IMREAD_UNCHANGED );
 	if( frame.empty() )
 	{
@@ -315,24 +327,19 @@ int main( int argc, char* argv[] )
 	if(frame.size().height > frame.size().width)
 		rotate(frame, frame, ROTATE_90_CLOCKWISE);
 	
-	imshow( "Imagem", frame );
+	//imshow( "Imagem", frame );
 
 	// Grayscale image
 	cvtColor(frame, IMAGE2, COLOR_BGR2GRAY);
+	imshow("Grayscale", IMAGE2);
 
 	IMAGE2 += 20;
 
-	// REFACTOR: threshold value shouldn't be static...
+	// Threshold image and remove unwanted objects
 	threshold(IMAGE2, IMAGE2, 100, 255, THRESH_BINARY_INV);
+	morphologyEx(IMAGE2, IMAGE2, MORPH_CLOSE, getStructuringElement(MORPH_RECT, Size(11, 11)));
 
-	/* Mat kernel = getStructuringElement(MORPH_RECT, Size(3, 3));
-	for(int i=0; i<1; i++){
-		erode(IMAGE2, IMAGE2, kernel);
-	} */
-
-	//morphologyEx(IMAGE2, IMAGE2, MORPH_CLOSE, getStructuringElement(MORPH_ELLIPSE, Size(7, 7)));
-
-	imshow("Imagem3", IMAGE2);
+	imshow("Threshold: 100", IMAGE2);
 
 	// Find contours   
 	vector<vector<Point>> contours;
@@ -355,6 +362,7 @@ int main( int argc, char* argv[] )
 	}
 	
 	vector<String> hand;
+	String detectedCards = "";
 
 	// Pre-process the image and get the rank and suit of the cards
 	try
@@ -364,7 +372,7 @@ int main( int argc, char* argv[] )
 				QueryCard card = preprocess_card(cardsContours[i], frame);
 				vector<String> a = getMatchCard(card, trainRanks, trainSuits);
 				hand.push_back(a.at(2));
-				cout << a.at(2) << endl;
+				detectedCards += a.at(2) + " ";
 			}
 		}else{
 			cout << "Detection error: 0 cards found" << endl;
@@ -372,24 +380,26 @@ int main( int argc, char* argv[] )
 	}
 	catch(...)
 	{
-		cout << "Errrrrrror" << '\n';
+		cout << "Error" << '\n';
 	}
 
-	cout << hand.at(3).c_str() << endl;
+	cout << "Detected cards: " << detectedCards << endl;
 	
+	imshow("Rank", ranks_inv);
+	imshow("Suit", suits_inv);
 	imshow("Diff Rank", diffsRank);
 	imshow("Diff Suit", diffsSuit);
 
 	if(hand.size() == 7){
 		Rank rank1 = EvaluateCards(hand.at(0).c_str(), hand.at(1).c_str(), hand.at(2).c_str(),
 								   hand.at(3).c_str(), hand.at(4).c_str(), hand.at(5).c_str(), hand.at(6).c_str());
-		cout << rank1.describeCategory() + ": " + rank1.describeRank() << endl;
+		cout << "Hand evaluation: " << rank1.describeCategory() + ", " + rank1.describeRank() << endl;
 	}else
 	{
 		cout << "Evaluation error: hand.size() != 7 -> Make sure you have 7 cards" << endl;
 	}
 
-	imshow( "Imagem", frame );
+	imshow( "Card Detection", frame );
 
 	// Wait for esc key
 	while (1)
