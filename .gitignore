@@ -6,3 +6,6 @@
 
 # ignore vscode files
 *.vscode/
+
+# ignore report source file
+OpenCV_84816_Report.doc
